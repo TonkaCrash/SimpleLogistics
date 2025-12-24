@@ -12,7 +12,7 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
+    <DebugType>portable</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>..\GameData\SimpleLogistics\</OutputPath>
     <DefineConstants>DEBUG;</DefineConstants>
@@ -88,7 +88,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GUIcore.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="LogisticsModule.cs" />
     <Compile Include="SimpleLogistics.cs" />
