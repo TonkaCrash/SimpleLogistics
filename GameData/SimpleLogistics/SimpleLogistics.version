@@ -1,8 +1,8 @@
 {
 	"NAME"           : "SimpleLogistics by RealGecko",
-	"URL"            : "https://raw.githubusercontent.com/TonkaCrash/SimpleLogistics/master/SimpleLogistics.version",
+	"URL"            : "https://github.com/TonkaCrash/SimpleLogistics/blob/master/GameData/SimpleLogistics/SimpleLogistics.version",
 	"DOWNLOAD"       : "https://github.com/TonkaCrash/SimpleLogistics/releases/latest",
-	"CHANGE_LOG_URL" : "https://raw.githubusercontent.com/TonkaCrash/SimpleLogistics/master/changelog.md",
+	"CHANGE_LOG_URL" : "https://github.com/TonkaCrash/SimpleLogistics/blob/master/README.md",
 	"GITHUB" :
 	{
 		"USERNAME"	        : "TonkaCrash",
@@ -13,7 +13,7 @@
 	{
 		"MAJOR" : 2,
 		"MINOR" : 1,
-		"PATCH" : 0,
+		"PATCH" : 1,
 		"BUILD" : 0
 	},
 	"KSP_VERSION" :

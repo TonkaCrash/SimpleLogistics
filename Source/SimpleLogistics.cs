@@ -37,7 +37,7 @@ namespace SimpleLogistics
         // Vessel Inventory
         private SortedList<string, double> vesselAmount;
         private SortedList<string, double> vesselMaxAmount;
-        private SortedList<string, double> vesselRequest;
+        private SortedList<string, double> VesselRequestList;
 
         private List<PartResource> partResources;
 
@@ -54,7 +54,16 @@ namespace SimpleLogistics
         private bool GUIactive;
 
         private ToolbarControl toolbarControl;
+        private GUIStyle TitleStyle;
+        private GUIStyle HeaderStyle;
+        private GUIStyle ResHeaderStyle;
+        private GUIStyle ResNameStyle;
+        private GUIStyle NumHeaderStyle;
+        private GUIStyle NumStyle;
         private GUIStyle ButtonStyle;
+        private GUIStyle SliderStyle;
+        private GUIStyle ThumbStyle;
+        private float GUIScale = GameSettings.UI_SCALE;
 
         // Same as Debug Toolbar lock mask
         private const ulong lockMask = 900719925474097919;
@@ -79,14 +88,14 @@ namespace SimpleLogistics
             // Vessel State
             vesselAmount = new SortedList<string, double>();
             vesselMaxAmount = new SortedList<string, double>();
-            vesselRequest = new SortedList<string, double>();
+            VesselRequestList = new SortedList<string, double>();
 
             partResources = new List<PartResource>();
 
             config = PluginConfiguration.CreateForType<SimpleLogistics>();
             config.load();
 
-            windowRect = config.GetValue<Rect>(this.name, new Rect(0, 0, 200, 200));
+            windowRect = config.GetValue<Rect>(this.name, new Rect(0, 0, 0, 0));
             windowId = GUIUtility.GetControlID(FocusType.Passive);
 
             GUIhidden = false;
@@ -96,12 +105,13 @@ namespace SimpleLogistics
 
             CreateButtonIcon();
 
-            SceneManager.sceneLoaded += OnSceneLoaded;
+            // SceneManager.sceneLoaded += OnSceneLoaded;
             GameEvents.onVesselChange.Add(OnVesselChange);
             GameEvents.onHideUI.Add(OnHideUI);
             GameEvents.onShowUI.Add(OnShowUI);
             GameEvents.onGamePause.Add(OnGamePause);
             GameEvents.onGameUnpause.Add(OnGameUnpause);
+            GameEvents.onUIScaleChange.Add(OnUIScaleChange);
         }
 
         private void OnDestroy()
@@ -109,18 +119,20 @@ namespace SimpleLogistics
             config.SetValue(this.name, windowRect);
             config.save();
 
-            SceneManager.sceneLoaded -= OnSceneLoaded;
+            //SceneManager.sceneLoaded -= OnSceneLoaded;
             GameEvents.onVesselChange.Remove(OnVesselChange);
             GameEvents.onHideUI.Remove(OnHideUI);
             GameEvents.onShowUI.Remove(OnShowUI);
             GameEvents.onGamePause.Remove(OnGamePause);
             GameEvents.onGameUnpause.Remove(OnGameUnpause);
+            GameEvents.onUIScaleChange.Remove(OnUIScaleChange);
 
             UnlockControls();
             DestroyLauncher();
 
             if (instance == this) instance = null;
         }
+        // Doesn't seem to ever get called
         public void OnSceneLoaded(Scene gameScene, LoadSceneMode mode)
         {
             if (Enum.TryParse<GameScenes>(gameScene.buildIndex.ToString(), out GameScenes scene))
@@ -134,9 +146,10 @@ namespace SimpleLogistics
         }
         private void OnVesselChange(Vessel vessel)
         {
+            VesselRequestList.Clear();
             InventoryVessel(vessel);
+            ResetGUI();
         }
-
         #endregion
 
         #region UI Functions
@@ -152,7 +165,6 @@ namespace SimpleLogistics
                 MODNAME
             );
         }
-
         public void DestroyLauncher()
         {
             if (toolbarControl != null)
@@ -161,45 +173,68 @@ namespace SimpleLogistics
                 Destroy(toolbarControl);
             }
         }
+        public void OnUIScaleChange()
+        {
+            GUIScale = GameSettings.UI_SCALE;
+        }
 
         public void OnGUI()
         {
             if (gamePaused || GUIhidden || !GUIactive) return;
 
-            if ((FlightGlobals.ActiveVessel.situation != Vessel.Situations.LANDED) &&
-                (FlightGlobals.ActiveVessel.situation != Vessel.Situations.SPLASHED) &&
-                (FlightGlobals.ActiveVessel.situation != Vessel.Situations.PRELAUNCH))
+            if (!(FlightGlobals.ActiveVessel.situation == Vessel.Situations.LANDED ||
+                  FlightGlobals.ActiveVessel.situation == Vessel.Situations.SPLASHED ||
+                  FlightGlobals.ActiveVessel.situation == Vessel.Situations.PRELAUNCH))
             {
                 toolbarControl.SetFalse();
             }
-
             GUI.skin = HighLogic.Skin;
-
-/*            ButtonStyle = new GUIStyle(HighLogic.Skin.button)
+            TitleStyle = new GUIStyle(GUI.skin.window)
+            {
+                fontSize = (int)(16 * GUIScale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.UpperCenter
+            };
+            HeaderStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = (int)(14 * GUIScale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            };
+            ButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = (int)(12 * GUIScale)
+            };
+            SliderStyle = new GUIStyle(GUI.skin.horizontalSlider)
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
+            ThumbStyle = new GUIStyle(GUI.skin.horizontalSliderThumb);
+            ResHeaderStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = (int)(12 * GUIScale),
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft
+            };
+            NumHeaderStyle = new GUIStyle(ResHeaderStyle)
+            {
+                alignment = TextAnchor.MiddleRight
+            };
+            ResNameStyle = new GUIStyle(ResHeaderStyle)
             {
                 normal = { textColor = Color.white },
-                fontSize = 18, // (int)(10 * GuiDisplaySize.Offset),
-                margin = new RectOffset(0, 0, 5, 5),
-                fixedHeight = ButtonStyle.fontSize,
-                margin = new RectOffset(0, 0, 1, 1),
-                padding = new RectOffset(),
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = (int)(11 * GuiDisplaySize.Offset),
-                fixedHeight = 18.0f * GuiDisplaySize.Offset
+                fontStyle = FontStyle.Normal,
+            };
+            NumStyle = new GUIStyle(ResNameStyle)
+            {
+                alignment = TextAnchor.MiddleRight
             };
 
-            CompactButtonStyle = new GUIStyle(ButtonStyle)
-            {
-                fontSize = (int)(10 * GuiDisplaySize.Offset),
-                margin = new RectOffset(0, 0, 5, 5),
-                fixedHeight = ButtonStyle.fontSize
-            };
-*/
             windowRect = ClickThruBlocker.GUILayoutWindow(
                 windowId,
                 windowRect,
                 DrawGUI,
-                Localizer.Format("#SimpLog_WindowTitle"),
+                Localizer.Format("#SimpLog_WindowTitle"), TitleStyle,
                 GUILayout.ExpandWidth(true),
                 GUILayout.ExpandHeight(true)
             );
@@ -208,123 +243,163 @@ namespace SimpleLogistics
             else
                 UnlockControls();
         }
-
+        public void ResetGUI()
+        {
+            windowRect.height = 0;
+            windowRect.width = 0;
+        }
         private void DrawGUI(int windowId)
         {
-            windowRect.height = 200;
-            GUILayout.BeginVertical();
+            LogisticsModule lm = FlightGlobals.ActiveVessel.FindPartModuleImplementing<LogisticsModule>();
+            if (lm == null) return; // no logistics module present, so skip GUI
 
-            GUI.color = Color.white;
-            GUILayout.Label("<b>" + Localizer.Format("#SimpLog_VesselName", FlightGlobals.ActiveVessel.GetDisplayName()) + "</b>");
+            GUILayout.BeginVertical();
+            GUILayout.Space(10 * GUIScale);
+            GUILayout.Label(Localizer.Format("#SimpLog_VesselName", FlightGlobals.ActiveVessel.GetDisplayName()), HeaderStyle);
+            GUILayout.Space(10 * GUIScale);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
             if (NetworkActive)
-            {
                 if (NetworkCount == 1)
-                    GUILayout.Label("Network Active: Only One Vessel in Network");
+                    GUILayout.Label(Localizer.Format("#SimpLog_OneConnected"), HeaderStyle); // "Only One Vessel in Resource Network"
                 else
-                    GUILayout.Label("Network Active: " + NetworkCount.ToString() + " Vessels in Network Active");
-            }
+                    GUILayout.Label(Localizer.Format("#SimpLog_MoreConnected", NetworkCount), HeaderStyle); // <<1>> Vessels in Resource Network
             else
-            { 
-                GUILayout.Label("No Vessels in Network");
-            }
-    
+                GUILayout.Label(Localizer.Format("#SimpLog_NoneConnected"), HeaderStyle); // "No Vessels Sharing Resources"
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.Space(10 * GUIScale);
 
             bool ableToRequest = false;
 
-            LogisticsModule lm = FlightGlobals.ActiveVessel.FindPartModuleImplementing<LogisticsModule>();
-            if (lm != null)
-            {
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button(Localizer.Format("#SimpLog_Toggle"), GUILayout.Width(150))) // "Toggle Plug"
-                    lm.Toggle();
-                GUI.contentColor = lm.IsActive ? Color.green : Color.white;
-                GUILayout.FlexibleSpace();
-
-                GUILayout.Label(lm.IsActive ? Localizer.Format("#SimpLog_Connected") : Localizer.Format("#SimpLog_Unplugged")); // "Plugged In" or "Unplugged"	
-                GUILayout.EndHorizontal();
-                GUILayout.Space(10);
-
-                // if plugged in - not able to request
-                ableToRequest = !lm.IsActive && NetworkActive;
+            GUILayout.BeginHorizontal();
+            bool CurrentState = lm.IsActive;
+            if (GUILayout.Button(Localizer.Format("#SimpLog_Toggle"), ButtonStyle)) // "Toggle Connection"
+                lm.Toggle();
+            if (CurrentState != lm.IsActive)
+            { // Toggle changed
+                ResetGUI();
+                NetworkActive = false;
+                return;
             }
+            GUI.contentColor = lm.IsActive ? Color.green : Color.red;
+            GUILayout.Label(" ", GUILayout.Width(20 * GUIScale));
+            GUILayout.Label(lm.IsActive ? Localizer.Format("#SimpLog_Connected") : Localizer.Format("#SimpLog_Unplugged"), HeaderStyle); // "Connected" or "Unplugged"	
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.Space(10 * GUIScale);
             GUI.contentColor = Color.white;
 
+            // if not plugged in and there is an active network
+            ableToRequest = !lm.IsActive && NetworkActive;
+
+            // 3 display modes
+            //        1) Not Connected to active network - display request sliders if resources can be loaded
+            //        2) Connected to active network - display pool inventory
+            //        3) No network - diplay current vessel inventory
             if (NetworkActive)
             {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(Localizer.Format("#SimpLog_Pool"), GUILayout.Width(150)); //"Resource Pool:"
-                GUILayout.FlexibleSpace();
-                GUILayout.Label("<b>Total</b>", GUILayout.Width(75)); 
-                GUILayout.EndHorizontal();
-
-                foreach (var resource in resourcePool)
+                if (ableToRequest)  // not plugged into active network
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label(resource.Key, GUILayout.Width(150));
-                    if (ableToRequest && vesselRequest.ContainsKey(resource.Key))
-                    {
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label(vesselRequest[resource.Key].ToString("0.0") + " / " + resource.Value.ToString("0.00"));
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label(vesselMaxAmount[resource.Key].ToString("0.0"));
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.BeginHorizontal();
-                        double amount = vesselMaxAmount[resource.Key] - vesselAmount[resource.Key];
-                        if (GUILayout.Button("0.0", GUILayout.Width(10)))
-                            vesselRequest[resource.Key] = 0;
-                        vesselRequest[resource.Key] = GUILayout.HorizontalSlider(
-                            (float)vesselRequest[resource.Key], 0, 
-                            (float)amount, 
-                            GUILayout.Width(200));
-                        if (GUILayout.Button(amount.ToString("0.0")))
-                            vesselRequest[resource.Key] = amount;
-                    }
-                    else
-                    {
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label(resource.Value.ToString("0.0"), GUILayout.Width(75));
-                    }
+                    GUILayout.Label(Localizer.Format("#SimpLog_VesselResources"), ResHeaderStyle, GUILayout.Width(150 * GUIScale)); // Vessel Resources
+                    GUILayout.Label(" ", GUILayout.Width(100));
+                    GUILayout.Label(Localizer.Format("#SimpLog_Request"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(Localizer.Format("#SimpLog_Pool"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(Localizer.Format("#SimpLog_Vessel"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(Localizer.Format("#SimpLog_Full"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(" ", GUILayout.Width(5));
                     GUILayout.EndHorizontal();
-                }
-                if (ableToRequest)
-                {
-                    GUILayout.Space(10);
+
+                    foreach (var resource in vesselAmount)
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label(resource.Key, ResNameStyle, GUILayout.Width(150 * GUIScale));
+                        if (resourcePool.ContainsKey(resource.Key))
+                        {
+                            double amount = Math.Min(vesselMaxAmount[resource.Key] - vesselAmount[resource.Key], resourcePool[resource.Key]);
+                            VesselRequestList[resource.Key] = GUILayout.HorizontalSlider((float)VesselRequestList[resource.Key],
+                                0, (float)amount, SliderStyle, ThumbStyle, GUILayout.Width(100));
+                            VesselRequestList[resource.Key] = Math.Min(VesselRequestList[resource.Key], resourcePool[resource.Key]);
+                            GUILayout.Label(VesselRequestList[resource.Key].ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
+                            GUILayout.Label(resourcePool[resource.Key].ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
+                        }
+                        else
+                        {
+                            GUILayout.Label(" ", GUILayout.Width(100));
+                            GUILayout.Label("0.0", NumStyle, GUILayout.Width(60 * GUIScale));
+                            GUILayout.Label(Localizer.Format("#SimpLog_na"), NumStyle, GUILayout.Width(60 * GUIScale));
+                        }
+                        GUILayout.Label(vesselAmount[resource.Key].ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
+                        // %Capacity
+                        if (vesselMaxAmount[resource.Key] > 0)
+                            GUILayout.Label((vesselAmount[resource.Key] / vesselMaxAmount[resource.Key]).ToString("0%"), NumStyle, GUILayout.Width(60 * GUIScale));
+                        else
+                            GUILayout.Label("0.0", NumStyle, GUILayout.Width(60 * GUIScale));
+
+                        GUILayout.Label(" ", GUILayout.Width(5));
+                        GUILayout.EndHorizontal();
+                    }
+                    GUILayout.Space(10 * GUIScale);
                     GUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
-                    if (GUILayout.Button(Localizer.Format("#SimpLog_Request"))) // "Request Resources"
+                    if (GUILayout.Button(Localizer.Format("#SimpLog_RequestResources"), ButtonStyle)) // "Request Resources"
                         requested = true;
                     GUILayout.FlexibleSpace();
                     GUILayout.EndHorizontal();
                 }
+                else // connected to network
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(Localizer.Format(Localizer.Format("#SimpLog_ResourcePool")), ResHeaderStyle, GUILayout.Width(150 * GUIScale));
+                    GUILayout.FlexibleSpace();
+                    GUILayout.Label(Localizer.Format("#SimpLog_Available"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(Localizer.Format("#SimpLog_Max"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(" ", GUILayout.Width(5));
+                    GUILayout.EndHorizontal();
+
+                    foreach (var resource in resourcePool)
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label(resource.Key, ResNameStyle, GUILayout.Width(150 * GUIScale));
+                        GUILayout.FlexibleSpace();
+                        GUILayout.Label(resource.Value.ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
+                        GUILayout.Label((resource.Value + emptySpacePool[resource.Key]).ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
+                        GUILayout.Label(" ", GUILayout.Width(5));
+                        GUILayout.EndHorizontal();
+                    }
+                }
             }
-            else
+            else // No active network
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(Localizer.Format("<b>Vessel Resources</b>"), GUILayout.Width(150));
+                GUILayout.Label(Localizer.Format("#SimpLog_VesselResources"), ResHeaderStyle, GUILayout.Width(150 * GUIScale));
                 GUILayout.FlexibleSpace();
-                GUILayout.Label(Localizer.Format("<b>Amount</b>"), GUILayout.Width(75));
+                GUILayout.Label(Localizer.Format("#SimpLog_Amount"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
                 GUILayout.FlexibleSpace();
-                GUILayout.Label(Localizer.Format("<b>Max</b>"), GUILayout.Width(75));
+                GUILayout.Label(Localizer.Format("#SimpLog_Max"), NumHeaderStyle, GUILayout.Width(60 * GUIScale));
+                GUILayout.Label(" ", GUILayout.Width(5));
                 GUILayout.EndHorizontal();
 
                 foreach (var resource in vesselAmount)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label(resource.Key, GUILayout.Width(150));
+                    GUILayout.Label(resource.Key, ResNameStyle, GUILayout.Width(150 * GUIScale));
                     GUILayout.FlexibleSpace();
-                    GUILayout.Label(vesselAmount[resource.Key].ToString("0.0"), GUILayout.Width(75));
+                    GUILayout.Label(vesselAmount[resource.Key].ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
                     GUILayout.FlexibleSpace();
-                    GUILayout.Label(vesselMaxAmount[resource.Key].ToString("0.0"), GUILayout.Width(75));
+                    GUILayout.Label(vesselMaxAmount[resource.Key].ToString("0.0"), NumStyle, GUILayout.Width(60 * GUIScale));
+                    GUILayout.Label(" ", GUILayout.Width(5));
                     GUILayout.EndHorizontal();
                 }
             }
 
-            GUILayout.Space(10);
+            GUILayout.Space(10 * GUIScale);
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             GUI.contentColor = Color.red;
-            if (GUILayout.Button(Localizer.Format("#SimpLog_Close")))
+            if (GUILayout.Button(Localizer.Format("#SimpLog_Close"), ButtonStyle))
                 toolbarControl.SetFalse();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -353,17 +428,23 @@ namespace SimpleLogistics
         {
             GUIhidden = false;
         }
+        public bool IsGUIhidden()
+        { return GUIhidden; }
 
         public void OnAppTrue()
         {
-            if ((FlightGlobals.ActiveVessel.situation != Vessel.Situations.LANDED) &&
-                (FlightGlobals.ActiveVessel.situation != Vessel.Situations.SPLASHED) &&
-                (FlightGlobals.ActiveVessel.situation != Vessel.Situations.PRELAUNCH))
+            if (FlightGlobals.ActiveVessel.situation == Vessel.Situations.LANDED ||
+                FlightGlobals.ActiveVessel.situation == Vessel.Situations.SPLASHED ||
+                FlightGlobals.ActiveVessel.situation == Vessel.Situations.PRELAUNCH)
             {
-                ScreenMessages.PostScreenMessage(Localizer.Format("#SimpLog_ErrorMsg"));
-                return;
+                GUIactive = true;
             }
-            GUIactive = true;
+            else
+            {
+                GUIactive = false;
+                ScreenMessages.PostScreenMessage(Localizer.Format("#SimpLog_ErrorMsg"));
+            }
+            return;
         }
 
         public void OnAppFalse()
@@ -374,19 +455,22 @@ namespace SimpleLogistics
 
         internal virtual void OnToggle()
         {
-            if ((FlightGlobals.ActiveVessel.situation != Vessel.Situations.LANDED) &&
-                (FlightGlobals.ActiveVessel.situation != Vessel.Situations.SPLASHED) &&
-                (FlightGlobals.ActiveVessel.situation != Vessel.Situations.PRELAUNCH))
+            if (FlightGlobals.ActiveVessel.situation == Vessel.Situations.LANDED ||
+                FlightGlobals.ActiveVessel.situation == Vessel.Situations.SPLASHED ||
+                FlightGlobals.ActiveVessel.situation == Vessel.Situations.PRELAUNCH)
+            {
+                GUIactive = !GUIactive;
+                if (!GUIactive)
+                    UnlockControls();
+                else
+                    ResetGUI();
+            }
+            else
             {
                 ScreenMessages.PostScreenMessage(Localizer.Format("#SimpLog_ErrorMsg"));
                 return;
             }
 
-            GUIactive = !GUIactive;
-            if (!GUIactive)
-            {
-                UnlockControls();
-            }
         }
 
         private ControlTypes LockControls()
@@ -415,10 +499,10 @@ namespace SimpleLogistics
                     double amount = resource.Value;
                     double empty = emptySpacePool[resource.Key];
                     // remove requests from pool
-                    if (requested && vesselRequest.ContainsKey(resource.Key))
+                    if (requested && VesselRequestList.ContainsKey(resource.Key))
                     {
-                        amount -= vesselRequest[resource.Key];
-                        empty += vesselRequest[resource.Key];
+                        amount -= VesselRequestList[resource.Key];
+                        empty += VesselRequestList[resource.Key];
                     }
                     ShareResource(resList, amount, empty);
                 }
@@ -426,6 +510,8 @@ namespace SimpleLogistics
                 {
                     TransferResources();
                     requested = false;
+                    VesselRequestList.Clear();
+                    InventoryVessel(FlightGlobals.ActiveVessel);
                 }
             }
         }
@@ -453,8 +539,7 @@ namespace SimpleLogistics
             var majors = resources.FindAll(r => r.maxAmount >= portion);
 
             if (minors.Count > 0)
-            {
-                // small tanks that are near full
+            {   // small tanks that are near full
                 foreach (var minor in minors)
                 {
                     minor.amount = Math.Max(0.0f, minor.maxAmount - spare);
@@ -465,8 +550,7 @@ namespace SimpleLogistics
                 ShareResource(majors, amount, empty);
             }
             else
-            {
-                // Portion size is good for everybody which means everybody is either same size or mostly empty.
+            {   // Portion size is good for everybody which means everybody is either same size or mostly empty.
                 foreach (var major in majors)
                     major.amount = portion;
             }
@@ -508,8 +592,8 @@ namespace SimpleLogistics
                 {
                     double value = resource.Value;
                     var resList = AvailableResources.FindAll(r => r.info.name == resource.Key);
-                    value += vesselRequest[resource.Key];
-                    vesselRequest[resource.Key] = 0;
+                    value += VesselRequestList[resource.Key];
+                    VesselRequestList[resource.Key] = 0;
                     double spareSpace = 0f;
                     ShareResource(resList, value, spareSpace);
                 }
@@ -522,28 +606,33 @@ namespace SimpleLogistics
         #endregion
         private void InventoryVessel(Vessel vessel)
         {   // vessel lists use common keys
-            vesselRequest.Clear();
             vesselAmount.Clear();
             vesselMaxAmount.Clear();
             foreach (Part part in vessel.parts)
             {
                 foreach (var resource in part.Resources)
-                {
-                    if (vesselRequest.ContainsKey(resource.info.name))
-                    {
-                        vesselAmount[resource.info.name] += resource.amount;
-                        vesselMaxAmount[resource.info.name] += resource.maxAmount;
-                    }
-                    else
-                    {
-                        vesselAmount.Add(resource.info.name, resource.amount);
-                        vesselMaxAmount.Add(resource.info.name, resource.maxAmount);
-                        vesselRequest.Add(resource.info.name, 0);
+                {   // we only care about resource that can be transferred
+                    if (resource.info.resourceTransferMode == ResourceTransferMode.NONE ||
+                           resource.info.resourceFlowMode == ResourceFlowMode.NO_FLOW ||
+                           resource._flowMode == PartResource.FlowMode.None || !resource._flowState)
+                        continue;
 
-                    }
+                    if (vesselAmount.ContainsKey(resource.info.name))
+                        vesselAmount[resource.info.name] += resource.amount;
+                    else
+                        vesselAmount.Add(resource.info.name, resource.amount);
+
+                    if (vesselMaxAmount.ContainsKey(resource.info.name))
+                        vesselMaxAmount[resource.info.name] += resource.maxAmount;
+                    else
+                        vesselMaxAmount.Add(resource.info.name, resource.maxAmount);
+
+                    if (!VesselRequestList.ContainsKey(resource.info.name))
+                        VesselRequestList.Add(resource.info.name, 0);
                 }
             }
         }
+
         private void InventoryNetwork()
         {
             emptySpacePool.Clear();
@@ -553,15 +642,14 @@ namespace SimpleLogistics
             NetworkActive = false; // turn off network
             foreach (Vessel vessel in FlightGlobals.VesselsLoaded)
             {   // situation valid
-                if ((vessel.situation != Vessel.Situations.LANDED) &&
-                    (vessel.situation != Vessel.Situations.SPLASHED) &&
-                    (vessel.situation != Vessel.Situations.PRELAUNCH))
+                if (!(vessel.situation == Vessel.Situations.LANDED ||
+                      vessel.situation == Vessel.Situations.SPLASHED ||
+                      vessel.situation == Vessel.Situations.PRELAUNCH))
                     continue;
                 // module activated
                 LogisticsModule lm = vessel.FindPartModuleImplementing<LogisticsModule>();
                 if (lm != null && !lm.IsActive)
                     continue;
-
                 // resource and parts allow transfer
                 foreach (Part part in vessel.parts)
                 {
@@ -598,6 +686,4 @@ namespace SimpleLogistics
             }
         }
     }
-
 }
-
